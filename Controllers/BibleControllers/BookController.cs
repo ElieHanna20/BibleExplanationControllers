@@ -8,9 +8,9 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class BookController(ApplicationDBContext context) : ControllerBase
+    public class BookController(BibleDbContext context) : ControllerBase
     {
-        private readonly ApplicationDBContext _context = context;
+        private readonly BibleDbContext _context = context;
 
         [HttpGet]
         public async Task<IActionResult> GetAll()

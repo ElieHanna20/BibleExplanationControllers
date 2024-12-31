@@ -8,9 +8,9 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class SubtitleController(ApplicationDBContext context) : Controller
+    public class SubtitleController(BibleDbContext context) : Controller
     {
-        private readonly ApplicationDBContext _context = context;
+        private readonly BibleDbContext _context = context;
 
         [HttpGet("chapter/{chapterId}")]
         public async Task<IActionResult> GetSubtitlesByChapter(int chapterId)

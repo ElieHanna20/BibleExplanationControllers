@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using BibleExplanationControllers.Models.User;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
@@ -17,5 +18,17 @@ namespace BibleExplanationControllers.Models.Bible
 
         [JsonIgnore]
         public Subtitle? Subtitle { get; set; } // Navigation property for the related subtitle (nullable)
+
+        [ForeignKey("SubAdmin")]
+        public int? SubAdminId { get; set; } // Foreign Key for SubAdmin
+
+        [JsonIgnore]
+        public SubAdmin? SubAdmin { get; set; } // Navigation property for managing SubAdmin
+
+        [ForeignKey("Worker")]
+        public int? WorkerId { get; set; } // Foreign Key for Worker
+
+        [JsonIgnore]
+        public Worker? Worker { get; set; } // Navigation property for managing Worker
     }
 }
