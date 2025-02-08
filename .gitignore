@@ -16,3 +16,6 @@ node_modules/
 
 # Ignore JetBrains Rider/IntelliJ files (if applicable)
 .idea/
+
+# Ignore appsettings.json to protect sensitive data
+appsettings.json

@@ -6,11 +6,13 @@ namespace BibleExplanationControllers.Data
 {
     public class BibleDbContext(DbContextOptions<BibleDbContext> options) : DbContext(options)
     {
-        public required DbSet<Book> Books { get; set; }
-        public required DbSet<Chapter> Chapters { get; set; }
-        public required DbSet<Subtitle> Subtitles { get; set; }
-        public required DbSet<Verse> Verses { get; set; }
-        public required DbSet<Explanation> Explanations { get; set; }
+
+        // Initialize required properties in the constructor
+        public required DbSet<Book> Books { get; set; } = default!;
+        public required DbSet<Chapter> Chapters { get; set; } = default!;
+        public required DbSet<Subtitle> Subtitles { get; set; } = default!;
+        public required DbSet<Verse> Verses { get; set; } = default!;
+        public required DbSet<Explanation> Explanations { get; set; } = default!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -66,6 +68,11 @@ namespace BibleExplanationControllers.Data
                 .HasOne(e => e.Worker)
                 .WithMany(w => w.Explanations)
                 .HasForeignKey(e => e.WorkerId);
+
+            modelBuilder.Entity<Worker>()
+                .HasOne(w => w.SubAdmin)
+                .WithMany(sa => sa.Workers)
+                .HasForeignKey(w => w.SubAdminId);
         }
     }
 }

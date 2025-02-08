@@ -4,16 +4,10 @@ using System.Text.Json.Serialization;
 
 namespace BibleExplanationControllers.Models.User
 {
-    public class Admin : IdentityUser<int>
+    public class Admin : IdentityUser
     {
-        [Key]
-        public override int Id { get; set; }
-
-        [Required]
-        public override string? UserName { get; set; }
-
-        [Required]
-        public override string? PasswordHash { get; set; }
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiry { get; set; }
 
         [JsonIgnore]
         public ICollection<SubAdmin> SubAdmins { get; set; } = [];
