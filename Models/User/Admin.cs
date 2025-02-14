@@ -1,14 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace BibleExplanationControllers.Models.User
 {
-    public class Admin : IdentityUser
-    {
-        public string? RefreshToken { get; set; }
-        public DateTime? RefreshTokenExpiry { get; set; }
-
+    public class Admin : AppUser
+    {   
         [JsonIgnore]
         public ICollection<SubAdmin> SubAdmins { get; set; } = [];
     }

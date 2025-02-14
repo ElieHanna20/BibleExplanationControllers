@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BibleExplanationControllers.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialMigration : Migration
+    public partial class InitAuthDb : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,12 +31,12 @@ namespace BibleExplanationControllers.Migrations
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    Discriminator = table.Column<string>(type: "character varying(13)", maxLength: 13, nullable: false),
                     RefreshToken = table.Column<string>(type: "text", nullable: true),
                     RefreshTokenExpiry = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    SubAdmin_CanChangeBooksData = table.Column<bool>(type: "boolean", nullable: true),
-                    AdminId = table.Column<string>(type: "text", nullable: true),
+                    Discriminator = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
                     CanChangeBooksData = table.Column<bool>(type: "boolean", nullable: true),
+                    AdminId = table.Column<string>(type: "text", nullable: true),
+                    Worker_CanChangeBooksData = table.Column<bool>(type: "boolean", nullable: true),
                     SubAdminId = table.Column<string>(type: "text", nullable: true),
                     UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),

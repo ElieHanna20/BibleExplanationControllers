@@ -2,10 +2,11 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Emit;
 
 namespace BibleExplanationControllers.Data
 {
-    public class AuthDbContext(DbContextOptions<AuthDbContext> options) : IdentityDbContext<IdentityUser>(options)
+    public class AuthDbContext(DbContextOptions<AuthDbContext> options) : IdentityDbContext<AppUser>(options)
     {
         public required DbSet<Admin> Admins { get; set; }
         public required DbSet<SubAdmin> SubAdmins { get; set; }
@@ -15,7 +16,6 @@ namespace BibleExplanationControllers.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Configure relationships
             modelBuilder.Entity<Admin>()
                 .HasMany(a => a.SubAdmins)
                 .WithOne(sa => sa.Admin)
@@ -26,15 +26,11 @@ namespace BibleExplanationControllers.Data
                 .WithOne(w => w.SubAdmin)
                 .HasForeignKey(w => w.SubAdminId);
 
-            modelBuilder.Entity<SubAdmin>()
-                .HasMany(sa => sa.Explanations)
-                .WithOne(e => e.SubAdmin)
-                .HasForeignKey(e => e.SubAdminId);
-
             modelBuilder.Entity<Worker>()
-                .HasMany(w => w.Explanations)
-                .WithOne(e => e.Worker)
-                .HasForeignKey(e => e.WorkerId);
+             .HasMany(w => w.Explanations)
+             .WithOne(e => e.Worker)
+             .HasForeignKey(e => e.WorkerId);
         }
     }
 }
+

@@ -1,11 +1,10 @@
 ﻿using BibleExplanationControllers.Models.Bible;
-using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace BibleExplanationControllers.Models.User
 {
-    public class SubAdmin : IdentityUser
+    public class SubAdmin : AppUser
     {
         public bool CanChangeBooksData { get; set; }
 

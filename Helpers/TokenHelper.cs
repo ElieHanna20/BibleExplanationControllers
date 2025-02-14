@@ -1,5 +1,4 @@
-﻿using BibleExplanationControllers.Models.User;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -15,32 +14,33 @@ namespace BibleExplanationControllers.Helpers
             return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)); // Secure refresh token
         }
 
-        public static string GenerateJwtToken(IdentityUser user, IConfiguration configuration, IList<string> roles)
+        public static (string AccessToken, string RefreshToken) GenerateJwtToken(IdentityUser user, IConfiguration config, IList<string> roles)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
             {
-                new(ClaimTypes.NameIdentifier, user.Id),
-                new(ClaimTypes.Name, user.UserName)
+                new(JwtRegisteredClaimNames.Sub, user.Id),
+                new(JwtRegisteredClaimNames.UniqueName, user.UserName!)
             };
 
-            // Add role claims dynamically
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
             }
 
             var token = new JwtSecurityToken(
-                configuration["Jwt:Issuer"],
-                configuration["Jwt:Issuer"],
+                config["Jwt:Issuer"],
+                config["Jwt:Audience"],
                 claims,
-                expires: DateTime.UtcNow.AddHours(2),
-                signingCredentials: creds
-            );
+                expires: DateTime.UtcNow.AddHours(1),
+                signingCredentials: credentials);
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+            var refreshToken = GenerateRefreshToken();
+
+            return (accessToken, refreshToken);
         }
 
     }

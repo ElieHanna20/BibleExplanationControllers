@@ -6,16 +6,20 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-
 namespace BibleExplanationControllers.Controllers.AuthControllers
 {
     [Route("api/admin/auth")]
     [ApiController]
-    public class AdminAuthController(UserManager<Admin> userManager, IConfiguration configuration, SignInManager<Admin> signInManager) : ControllerBase
+    public class AdminAuthController : ControllerBase
     {
-        private readonly UserManager<Admin> _userManager = userManager;
-        private readonly IConfiguration _configuration = configuration;
-        private readonly SignInManager<Admin> _signInManager = signInManager;
+        private readonly UserManager<AppUser> _userManager;
+        private readonly IConfiguration _configuration;
+
+        public AdminAuthController(UserManager<AppUser> userManager, IConfiguration configuration)
+        {
+            _userManager = userManager;
+            _configuration = configuration;
+        }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] AdminSettings loginDto)
@@ -24,52 +28,55 @@ namespace BibleExplanationControllers.Controllers.AuthControllers
             if (admin == null)
                 return Unauthorized(new { message = "Invalid credentials" });
 
-            var result = await _signInManager.PasswordSignInAsync(admin, loginDto.Password, false, false);
-            if (!result.Succeeded)
+            // Validate password without creating a session
+            bool isValidPassword = await _userManager.CheckPasswordAsync(admin, loginDto.Password);
+            if (!isValidPassword)
                 return Unauthorized(new { message = "Invalid credentials" });
 
             // Get user roles
             var roles = await _userManager.GetRolesAsync(admin);
 
             // Generate tokens
-            var jwtToken = TokenHelper.GenerateJwtToken(admin, _configuration, roles);
-            var refreshToken = TokenHelper.GenerateRefreshToken();
+            var (accessToken, refreshToken) = TokenHelper.GenerateJwtToken(admin, _configuration, roles);
 
-            // Save refresh token in DB
+            // Save refresh token & expiry in DB
             admin.RefreshToken = refreshToken;
             admin.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
             await _userManager.UpdateAsync(admin);
 
             return Ok(new
             {
-                token = jwtToken,
-                refreshToken
+                AccessToken = accessToken,
+                RefreshToken = refreshToken
             });
         }
+
 
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] TokenRefreshRequestDto refreshDto)
         {
-            var admin = await _userManager.Users.FirstOrDefaultAsync(u => u.RefreshToken == refreshDto.RefreshToken);
-            if (admin == null || admin.RefreshTokenExpiry < DateTime.UtcNow)
+            // Filter for Admin users only
+            var user = await _userManager.Users
+                .OfType<Admin>()
+                .FirstOrDefaultAsync(u => u.RefreshToken == refreshDto.RefreshToken);
+            if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
                 return Unauthorized(new { message = "Invalid or expired refresh token" });
 
-            // Get user roles
-            var roles = await _userManager.GetRolesAsync(admin);
+            // Get roles for the user
+            var roles = await _userManager.GetRolesAsync(user);
 
             // Generate new tokens
-            var newJwtToken = TokenHelper.GenerateJwtToken(admin, _configuration, roles);
-            var newRefreshToken = TokenHelper.GenerateRefreshToken();
+            var (newAccessToken, newRefreshToken) = TokenHelper.GenerateJwtToken(user, _configuration, roles);
 
-            // Update refresh token in DB
-            admin.RefreshToken = newRefreshToken;
-            admin.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-            await _userManager.UpdateAsync(admin);
+            // Update refresh token and expiry in DB
+            user.RefreshToken = newRefreshToken;
+            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            await _userManager.UpdateAsync(user);
 
             return Ok(new
             {
-                token = newJwtToken,
-                refreshToken = newRefreshToken
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken
             });
         }
     }

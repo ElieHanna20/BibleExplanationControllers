@@ -1,34 +1,37 @@
-using BibleExplanationControllers.Helpers;
 using BibleExplanationControllers.Data;
+using BibleExplanationControllers.Helpers;
+using BibleExplanationControllers.Models.User;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using BibleExplanationControllers.Models.User;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
+builder.Services.AddSwaggerGen(options =>
 {
-    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "API v1", Version = "v1" });
+    // Add JWT security definition
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
         Name = "Authorization",
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
-        Scheme = "Bearer",
-        BearerFormat = "JWT",
-        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
-        Description = "Enter JWT Bearer token"
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
     });
-
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
-            {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
-                {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+            new OpenApiSecurityScheme {
+                Reference = new OpenApiReference {
+                    Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
                 }
             },
@@ -37,42 +40,74 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Add DbContexts
+// Add DbContexts with PostgreSQL connection strings
 builder.Services.AddDbContext<BibleDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("BibleConnection")));
+
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("AuthConnection")));
 
-// Add Identity services
-builder.Services.AddIdentity<Admin, IdentityRole>()
-    .AddEntityFrameworkStores<AuthDbContext>()
-    .AddDefaultTokenProviders();
+// Register Identity using AppUser as the user type
+builder.Services.AddIdentityCore<AppUser>(options =>
+{
+    // Identity options if needed
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<AuthDbContext>();
 
-// Add JWT Authentication service
-builder.Services.AddJwtAuthentication(builder.Configuration);
+// Configure Identity to not use cookies
+builder.Services.Configure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.ExpireTimeSpan = TimeSpan.Zero; // Immediately expire the cookie
+    options.SlidingExpiration = false;
+    options.Events.OnRedirectToLogin = context =>
+    {
+        // Prevent redirects on unauthorized responses
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = context =>
+    {
+        // Prevent redirects on forbidden responses
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
+
+// Use only the UserManager for AppUser.
+builder.Services.AddScoped<UserManager<AppUser>>();
+
+// Configure JWT authentication only
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultSignInScheme = null; // Ensure no SignIn scheme is set
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false; // Set to true in production
+    options.SaveToken = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
+});
 
 builder.Services.AddAuthorization();
 
+// Register the Helpers class for DI (it uses UserManager<AppUser>)
+builder.Services.AddScoped<Helpers>();
+
 var app = builder.Build();
 
-// Ensure the admin user is seeded BEFORE the app starts
-try
-{
-    using var scope = app.Services.CreateScope();
-    var services = scope.ServiceProvider;
-    var configuration = services.GetRequiredService<IConfiguration>();
-
-    // Call the seeding function
-    await Helpers.SeedAdminAsync(services, configuration);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Fatal error during seeding: {ex.Message}");
-    return; // Stop app from running
-}
-
-
-// Configure middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -87,12 +122,23 @@ app.UseHttpsRedirection();
 // Configure CORS
 CorsConfig.ConfigureCors(app, builder.Configuration);
 
-// Add authentication middleware
 app.UseAuthentication();
-
-// Add authorization middleware
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Seed Admin user before the app starts
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+try
+{
+    using var scope = app.Services.CreateScope();
+    var helpers = scope.ServiceProvider.GetRequiredService<Helpers>();
+    await helpers.SeedAdminAsync(builder.Configuration);
+}
+catch (Exception ex)
+{
+    logger.LogError($"Fatal error during seeding: {ex.Message}");
+    return;
+}
 
 app.Run();
