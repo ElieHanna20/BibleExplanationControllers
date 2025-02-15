@@ -1,27 +1,29 @@
 ﻿using BibleExplanationControllers.Dtos.WorkerDtos;
 using BibleExplanationControllers.Models.User;
+using System;
 
 namespace BibleExplanationControllers.Mappers
 {
     public static class WorkerMapper
     {
-        public static Worker ToWorker(this WorkerCreateDto dto, string subAdminId)
+        public static Worker ToWorker(this WorkerCreateDto dto, Guid subAdminId)
         {
             return new Worker
             {
-                UserName = dto.Username,
+                Id = Guid.NewGuid(),
+                Username = dto.Username,
                 SubAdminId = subAdminId,
-                CanChangeBooksData = dto.CanChangeBooksData ?? false
+                CanChangeBooksData = dto.CanChangeBooksData ?? false,
+                PasswordHash = string.Empty // Will be set in the controller after hashing
             };
         }
-
 
         public static WorkerDetailsDto ToWorkerResponseDto(this Worker worker)
         {
             return new WorkerDetailsDto
             {
-                Id = worker.Id,
-                Username = worker.UserName,
+                Id = worker.Id, // Now a Guid
+                Username = worker.Username,
                 CanChangeBooksData = worker.CanChangeBooksData
             };
         }
@@ -30,13 +32,14 @@ namespace BibleExplanationControllers.Mappers
         {
             if (!string.IsNullOrWhiteSpace(dto.Username))
             {
-                worker.UserName = dto.Username;
+                worker.Username = dto.Username;
             }
 
             if (dto.CanChangeBooksData.HasValue)
             {
                 worker.CanChangeBooksData = dto.CanChangeBooksData.Value;
             }
+            // Password is handled separately in the controller
         }
     }
 }

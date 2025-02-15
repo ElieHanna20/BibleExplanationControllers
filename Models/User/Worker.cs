@@ -9,7 +9,7 @@ namespace BibleExplanationControllers.Models.User
         public bool CanChangeBooksData { get; set; }
 
         [ForeignKey("SubAdmin")]
-        public string SubAdminId { get; set; } = string.Empty;
+        public Guid SubAdminId { get; set; } 
 
         [JsonIgnore]
         public SubAdmin SubAdmin { get; set; } = default!;

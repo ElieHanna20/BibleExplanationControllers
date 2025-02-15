@@ -1,47 +1,52 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.IdentityModel.Tokens;
+﻿using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using BibleExplanationControllers.Models.User;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BibleExplanationControllers.Helpers
 {
-    public static class TokenHelper
+    public class TokenHelper
     {
-        public static string GenerateRefreshToken()
+        private readonly IConfiguration _configuration;
+
+        public TokenHelper(IConfiguration configuration)
         {
-            return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)); // Secure refresh token
+            _configuration = configuration;
         }
 
-        public static (string AccessToken, string RefreshToken) GenerateJwtToken(IdentityUser user, IConfiguration config, IList<string> roles)
+        public string GenerateJwtToken(AppUser user, string role)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]);
 
-            var claims = new List<Claim>
+            var tokenDescriptor = new SecurityTokenDescriptor
             {
-                new(JwtRegisteredClaimNames.Sub, user.Id),
-                new(JwtRegisteredClaimNames.UniqueName, user.UserName!)
+                Subject = new ClaimsIdentity(
+                [
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Name, user.Username!),
+                    new Claim(ClaimTypes.Role, role)
+                ]),
+                Expires = DateTime.UtcNow.AddHours(1), // Access token valid for 1 hour
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature),
+                Issuer = _configuration["Jwt:Issuer"],
+                Audience = _configuration["Jwt:Audience"]
             };
 
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var token = new JwtSecurityToken(
-                config["Jwt:Issuer"],
-                config["Jwt:Audience"],
-                claims,
-                expires: DateTime.UtcNow.AddHours(1),
-                signingCredentials: credentials);
-
-            var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
-            var refreshToken = GenerateRefreshToken();
-
-            return (accessToken, refreshToken);
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
 
+        // Method to generate refresh tokens
+        public string GenerateRefreshToken()
+        {
+            var randomNumber = new byte[32];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomNumber);
+            return Convert.ToBase64String(randomNumber);
+        }
     }
 }

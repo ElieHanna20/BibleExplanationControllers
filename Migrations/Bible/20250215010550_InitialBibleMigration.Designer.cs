@@ -9,11 +9,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BibleExplanationControllers.Migrations.BibleDb
+namespace BibleExplanationControllers.Migrations.Bible
 {
     [DbContext(typeof(BibleDbContext))]
-    [Migration("20250214204317_InitBibleDb")]
-    partial class InitBibleDb
+    [Migration("20250215010550_InitialBibleMigration")]
+    partial class InitialBibleMigration
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -80,14 +80,14 @@ namespace BibleExplanationControllers.Migrations.BibleDb
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("SubAdminId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("SubAdminId")
+                        .HasColumnType("uuid");
 
                     b.Property<int?>("SubtitleId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("WorkerId")
-                        .HasColumnType("text");
+                    b.Property<Guid?>("WorkerId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -156,41 +156,13 @@ namespace BibleExplanationControllers.Migrations.BibleDb
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.Admin", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ConcurrencyStamp")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("RefreshToken")
                         .HasColumnType("text");
@@ -198,13 +170,8 @@ namespace BibleExplanationControllers.Migrations.BibleDb
                     b.Property<DateTime?>("RefreshTokenExpiry")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserName")
+                    b.Property<string>("Username")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -214,48 +181,19 @@ namespace BibleExplanationControllers.Migrations.BibleDb
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.SubAdmin", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("AdminId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid>("AdminId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("CanChangeBooksData")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("ConcurrencyStamp")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasColumnType("text");
-
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("RefreshToken")
                         .HasColumnType("text");
@@ -263,13 +201,8 @@ namespace BibleExplanationControllers.Migrations.BibleDb
                     b.Property<DateTime?>("RefreshTokenExpiry")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserName")
+                    b.Property<string>("Username")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -281,44 +214,16 @@ namespace BibleExplanationControllers.Migrations.BibleDb
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.Worker", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("AccessFailedCount")
-                        .HasColumnType("integer");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("CanChangeBooksData")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("ConcurrencyStamp")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("NormalizedEmail")
-                        .HasColumnType("text");
-
-                    b.Property<string>("NormalizedUserName")
-                        .HasColumnType("text");
-
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("PhoneNumber")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("RefreshToken")
                         .HasColumnType("text");
@@ -326,17 +231,11 @@ namespace BibleExplanationControllers.Migrations.BibleDb
                     b.Property<DateTime?>("RefreshTokenExpiry")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("SecurityStamp")
-                        .HasColumnType("text");
+                    b.Property<Guid>("SubAdminId")
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("SubAdminId")
+                    b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("UserName")
                         .HasColumnType("text");
 
                     b.HasKey("Id");

@@ -9,8 +9,9 @@ namespace BibleExplanationControllers.Models.User
         public bool CanChangeBooksData { get; set; }
 
         [ForeignKey("Admin")]
-        public string AdminId { get; set; } = string.Empty;
+        public Guid AdminId { get; set; }
 
+        [ForeignKey("AdminId")]
         [JsonIgnore]
         public Admin? Admin { get; set; } = default!;
 

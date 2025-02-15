@@ -2,9 +2,12 @@
 using BibleExplanationControllers.Mappers;
 using BibleExplanationControllers.Models.User;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Security.Claims;
+using BibleExplanationControllers.Helpers;
+using BibleExplanationControllers.Data;
 
 namespace BibleExplanationControllers.Controllers.SubAdminControllers
 {
@@ -13,56 +16,65 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
     [Authorize(Roles = "Admin")]
     public class SubAdminController : ControllerBase
     {
-        private readonly UserManager<AppUser> _userManager;
+        private readonly AuthDbContext _context;
+        private readonly PasswordHasher _passwordHasher;
 
-        public SubAdminController(UserManager<AppUser> userManager)
+        public SubAdminController(AuthDbContext context, PasswordHasher passwordHasher)
         {
-            _userManager = userManager;
+            _context = context;
+            _passwordHasher = passwordHasher;
         }
 
         [HttpPost("create")]
         public async Task<IActionResult> CreateSubAdmin([FromBody] SubAdminCreateDto dto)
         {
-            // Get the current user and ensure it's an Admin.
-            var currentUser = await _userManager.GetUserAsync(User);
-            if (!(currentUser is Admin))
+            // Get current user ID from token
+            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(currentUserIdString))
+                return Unauthorized("Invalid credentials");
+
+            if (!Guid.TryParse(currentUserIdString, out var currentUserId))
+                return Unauthorized("Invalid user ID");
+
+            // Fetch current user from the database
+            var currentUser = await _context.Admins.FindAsync(currentUserId);
+            if (currentUser == null)
                 return Unauthorized("Invalid Admin");
 
-            // Convert the DTO to a SubAdmin instance.
-            var subAdmin = dto.ToSubAdmin();
+            // Check if username already exists
+            if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
+                return BadRequest(new { message = "Username already exists" });
 
-            // Create the SubAdmin user.
-            var result = await _userManager.CreateAsync(subAdmin, dto.Password);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
+            // Convert the DTO to a SubAdmin instance
+            var subAdmin = dto.ToSubAdmin(currentUser.Id);
+
+            // Hash the password
+            subAdmin.PasswordHash = _passwordHasher.HashPassword(dto.Password);
+
+            // Add SubAdmin to the database
+            _context.SubAdmins.Add(subAdmin);
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "SubAdmin created successfully" });
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSubAdmin(string id)
+        public async Task<IActionResult> DeleteSubAdmin(Guid id)
         {
-            var subAdmin = await _userManager.Users
-                .OfType<SubAdmin>()
-                .FirstOrDefaultAsync(u => u.Id == id);
-
+            var subAdmin = await _context.SubAdmins.FindAsync(id);
             if (subAdmin == null)
                 return NotFound("SubAdmin not found");
 
-            var result = await _userManager.DeleteAsync(subAdmin);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
+            _context.SubAdmins.Remove(subAdmin);
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "SubAdmin deleted successfully" });
         }
 
         [HttpPatch("{id}")]
-        public async Task<IActionResult> UpdateSubAdmin(string id, [FromBody] SubAdminUpdateDto dto)
+        public async Task<IActionResult> UpdateSubAdmin(Guid id, [FromBody] SubAdminUpdateDto dto)
         {
-            var subAdmin = await _userManager.Users
-                .OfType<SubAdmin>()
-                .FirstOrDefaultAsync(u => u.Id == id);
-
+            var subAdmin = await _context.SubAdmins.FindAsync(id);
             if (subAdmin == null)
                 return NotFound("SubAdmin not found");
 
@@ -72,15 +84,12 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
             // Update password if provided.
             if (!string.IsNullOrWhiteSpace(dto.Password))
             {
-                var token = await _userManager.GeneratePasswordResetTokenAsync(subAdmin);
-                var passwordResult = await _userManager.ResetPasswordAsync(subAdmin, token, dto.Password);
-                if (!passwordResult.Succeeded)
-                    return BadRequest(passwordResult.Errors);
+                // Hash and update the password
+                subAdmin.PasswordHash = _passwordHasher.HashPassword(dto.Password);
             }
 
-            var updateResult = await _userManager.UpdateAsync(subAdmin);
-            if (!updateResult.Succeeded)
-                return BadRequest(updateResult.Errors);
+            _context.SubAdmins.Update(subAdmin);
+            await _context.SaveChangesAsync();
 
             return Ok(new { message = "SubAdmin updated successfully" });
         }
@@ -88,8 +97,7 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
         [HttpGet]
         public async Task<IActionResult> GetAllSubAdmins()
         {
-            var subAdmins = await _userManager.Users
-                .OfType<SubAdmin>()
+            var subAdmins = await _context.SubAdmins
                 .Select(sa => sa.ToSubAdminDetailsDto())
                 .ToListAsync();
 
@@ -97,12 +105,9 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetSubAdminById(string id)
+        public async Task<IActionResult> GetSubAdminById(Guid id)
         {
-            var subAdmin = await _userManager.Users
-                .OfType<SubAdmin>()
-                .FirstOrDefaultAsync(u => u.Id == id);
-
+            var subAdmin = await _context.SubAdmins.FindAsync(id);
             if (subAdmin == null)
                 return NotFound("SubAdmin not found");
 

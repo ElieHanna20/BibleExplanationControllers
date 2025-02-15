@@ -1,9 +1,6 @@
 using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Helpers;
-using BibleExplanationControllers.Models.User;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -11,21 +8,29 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add services to the container.
+
 builder.Services.AddControllers();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddEndpointsApiExplorer();
+
+// Configure Swagger/OpenAPI
 builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new OpenApiInfo { Title = "API v1", Version = "v1" });
-    // Add JWT security definition
+
+    // Configure JWT authentication for Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Description = "JWT Authorization header using the Bearer scheme. " +
+                      "\r\n\r\nEnter 'Bearer' [space] and then your token in the text input below." +
+                      "\r\n\r\nExample: \"Bearer 12345abcdef\"",
         Name = "Authorization",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
     });
+
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -33,95 +38,66 @@ builder.Services.AddSwaggerGen(options =>
                 Reference = new OpenApiReference {
                     Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
-                }
+                },
+                In = ParameterLocation.Header
             },
             Array.Empty<string>()
         }
     });
 });
 
-// Add DbContexts with PostgreSQL connection strings
+// Configure DbContext
+builder.Services.AddDbContext<AuthDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("AuthConnection")));
 builder.Services.AddDbContext<BibleDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("BibleConnection")));
 
-builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("AuthConnection")));
 
-// Register Identity using AppUser as the user type
-builder.Services.AddIdentityCore<AppUser>(options =>
-{
-    // Identity options if needed
-})
-.AddRoles<IdentityRole>()
-.AddEntityFrameworkStores<AuthDbContext>();
+// Register PasswordHasher and Helpers
+builder.Services.AddScoped<PasswordHasher>();
+builder.Services.AddScoped<Helpers>();
+builder.Services.AddScoped<TokenHelper>(); // Register TokenHelper
 
-// Configure Identity to not use cookies
-builder.Services.Configure<CookieAuthenticationOptions>(IdentityConstants.ApplicationScheme, options =>
-{
-    options.Cookie.HttpOnly = true;
-    options.ExpireTimeSpan = TimeSpan.Zero; // Immediately expire the cookie
-    options.SlidingExpiration = false;
-    options.Events.OnRedirectToLogin = context =>
+// Configure JWT authentication
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        // Prevent redirects on unauthorized responses
-        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        return Task.CompletedTask;
-    };
-    options.Events.OnRedirectToAccessDenied = context =>
-    {
-        // Prevent redirects on forbidden responses
-        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        return Task.CompletedTask;
-    };
-});
+        // Enforce HTTPS in production
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.SaveToken = false; // Not needed since we're handling tokens manually
 
-// Use only the UserManager for AppUser.
-builder.Services.AddScoped<UserManager<AppUser>>();
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
 
-// Configure JWT authentication only
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultSignInScheme = null; // Ensure no SignIn scheme is set
-})
-.AddJwtBearer(options =>
-{
-    options.RequireHttpsMetadata = false; // Set to true in production
-    options.SaveToken = false;
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["Jwt:Issuer"],
-        ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-    };
-});
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+
+            ValidateAudience = true, // Set to true if you are validating the audience
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+
+            ValidateLifetime = true, // Ensure token hasn't expired
+            ClockSkew = TimeSpan.Zero // Optional: reduce default clock skew of 5 mins
+        };
+    });
 
 builder.Services.AddAuthorization();
 
-// Register the Helpers class for DI (it uses UserManager<AppUser>)
-builder.Services.AddScoped<Helpers>();
-
 var app = builder.Build();
+
+// Configure the HTTP request pipeline.
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "API v1");
-    });
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
-// Configure CORS
-CorsConfig.ConfigureCors(app, builder.Configuration);
-
+// Enable authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -1,44 +1,41 @@
-﻿using BibleExplanationControllers.Models.Bible;
+﻿using Microsoft.EntityFrameworkCore;
+using BibleExplanationControllers.Models.Bible;
 using BibleExplanationControllers.Models.User;
-using Microsoft.EntityFrameworkCore;
 
 namespace BibleExplanationControllers.Data
 {
-    public class BibleDbContext(DbContextOptions<BibleDbContext> options) : DbContext(options)
+    public class BibleDbContext : DbContext
     {
+        public BibleDbContext(DbContextOptions<BibleDbContext> options) : base(options)
+        {
+        }
 
-        // Initialize required properties in the constructor
-        public required DbSet<Book> Books { get; set; } = default!;
-        public required DbSet<Chapter> Chapters { get; set; } = default!;
-        public required DbSet<Subtitle> Subtitles { get; set; } = default!;
-        public required DbSet<Verse> Verses { get; set; } = default!;
-        public required DbSet<Explanation> Explanations { get; set; } = default!;
+        public DbSet<Book> Books { get; set; }
+        public DbSet<Chapter> Chapters { get; set; }
+        public DbSet<Subtitle> Subtitles { get; set; }
+        public DbSet<Verse> Verses { get; set; }
+        public DbSet<Explanation> Explanations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Configure the schema
             modelBuilder.Entity<Book>().ToTable("Books", "bible");
             modelBuilder.Entity<Chapter>().ToTable("Chapters", "bible");
             modelBuilder.Entity<Subtitle>().ToTable("Subtitles", "bible");
             modelBuilder.Entity<Verse>().ToTable("Verses", "bible");
             modelBuilder.Entity<Explanation>().ToTable("Explanations", "bible");
 
-            // Enforce uniqueness on 'Name' field of the Book model
             modelBuilder.Entity<Book>()
                 .HasIndex(b => b.Name)
                 .IsUnique();
 
-            // Enforce a composite unique index on BookId and ChapterNumber
             modelBuilder.Entity<Chapter>()
                 .HasIndex(c => new { c.BookId, c.ChapterNumber })
                 .IsUnique();
 
-            // Enforce a composite unique index on ChapterId and SubtitleName
             modelBuilder.Entity<Subtitle>()
                 .HasIndex(s => new { s.ChapterId, s.SubtitleName })
                 .IsUnique();
 
-            // Relationships
             modelBuilder.Entity<Chapter>()
                 .HasOne(c => c.Book)
                 .WithMany(b => b.Chapters)

@@ -1,48 +1,45 @@
-﻿using BibleExplanationControllers.Dtos.AdminDtos;
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using BibleExplanationControllers.Data;
+using BibleExplanationControllers.Dtos.AdminDtos;
 using BibleExplanationControllers.Dtos.AuthDtos;
 using BibleExplanationControllers.Helpers;
 using BibleExplanationControllers.Models.User;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace BibleExplanationControllers.Controllers.AuthControllers
 {
     [Route("api/admin/auth")]
     [ApiController]
-    public class AdminAuthController : ControllerBase
+    public class AdminAuthController(AuthDbContext context, PasswordHasher passwordHasher, TokenHelper tokenHelper) : ControllerBase
     {
-        private readonly UserManager<AppUser> _userManager;
-        private readonly IConfiguration _configuration;
-
-        public AdminAuthController(UserManager<AppUser> userManager, IConfiguration configuration)
-        {
-            _userManager = userManager;
-            _configuration = configuration;
-        }
+        private readonly AuthDbContext _context = context;
+        private readonly PasswordHasher _passwordHasher = passwordHasher;
+        private readonly TokenHelper _tokenHelper = tokenHelper;
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] AdminSettings loginDto)
         {
-            var admin = await _userManager.FindByNameAsync(loginDto.Username);
+            // Find the admin by username
+            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Username == loginDto.Username);
             if (admin == null)
                 return Unauthorized(new { message = "Invalid credentials" });
 
-            // Validate password without creating a session
-            bool isValidPassword = await _userManager.CheckPasswordAsync(admin, loginDto.Password);
-            if (!isValidPassword)
+            // Verify the password
+            if (!_passwordHasher.VerifyPassword(admin.PasswordHash, loginDto.Password))
                 return Unauthorized(new { message = "Invalid credentials" });
 
-            // Get user roles
-            var roles = await _userManager.GetRolesAsync(admin);
-
             // Generate tokens
-            var (accessToken, refreshToken) = TokenHelper.GenerateJwtToken(admin, _configuration, roles);
+            var accessToken = _tokenHelper.GenerateJwtToken(admin, "Admin");
+            var refreshToken = _tokenHelper.GenerateRefreshToken();
 
             // Save refresh token & expiry in DB
             admin.RefreshToken = refreshToken;
             admin.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-            await _userManager.UpdateAsync(admin);
+            _context.Admins.Update(admin);
+            await _context.SaveChangesAsync();
 
             return Ok(new
             {
@@ -51,27 +48,23 @@ namespace BibleExplanationControllers.Controllers.AuthControllers
             });
         }
 
-
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] TokenRefreshRequestDto refreshDto)
         {
-            // Filter for Admin users only
-            var user = await _userManager.Users
-                .OfType<Admin>()
-                .FirstOrDefaultAsync(u => u.RefreshToken == refreshDto.RefreshToken);
-            if (user == null || user.RefreshTokenExpiry < DateTime.UtcNow)
+            // Find the admin by refresh token
+            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.RefreshToken == refreshDto.RefreshToken);
+            if (admin == null || admin.RefreshTokenExpiry <= DateTime.UtcNow)
                 return Unauthorized(new { message = "Invalid or expired refresh token" });
 
-            // Get roles for the user
-            var roles = await _userManager.GetRolesAsync(user);
-
             // Generate new tokens
-            var (newAccessToken, newRefreshToken) = TokenHelper.GenerateJwtToken(user, _configuration, roles);
+            var newAccessToken = _tokenHelper.GenerateJwtToken(admin, "Admin");
+            var newRefreshToken = _tokenHelper.GenerateRefreshToken();
 
             // Update refresh token and expiry in DB
-            user.RefreshToken = newRefreshToken;
-            user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
-            await _userManager.UpdateAsync(user);
+            admin.RefreshToken = newRefreshToken;
+            admin.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+            _context.Admins.Update(admin);
+            await _context.SaveChangesAsync();
 
             return Ok(new
             {

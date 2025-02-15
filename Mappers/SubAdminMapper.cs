@@ -1,16 +1,20 @@
 ﻿using BibleExplanationControllers.Dtos.SubAdminDtos;
 using BibleExplanationControllers.Models.User;
+using System;
 
 namespace BibleExplanationControllers.Mappers
 {
     public static class SubAdminMapper
     {
-        public static SubAdmin ToSubAdmin(this SubAdminCreateDto dto)
+        public static SubAdmin ToSubAdmin(this SubAdminCreateDto dto, Guid adminId)
         {
             return new SubAdmin
             {
-                UserName = dto.Username,
-                CanChangeBooksData = dto.CanChangeBooksData
+                Id = Guid.NewGuid(), // Generate a new GUID for the SubAdmin's Id
+                Username = dto.Username,
+                AdminId = adminId, // Assign the Admin's Id
+                CanChangeBooksData = dto.CanChangeBooksData,
+                PasswordHash = string.Empty // Placeholder; will be set after hashing
             };
         }
 
@@ -18,8 +22,8 @@ namespace BibleExplanationControllers.Mappers
         {
             return new SubAdminDetailsDto
             {
-                Id = subAdmin.Id,
-                Username = subAdmin.UserName,
+                Id = subAdmin.Id, // Now both are Guid, assignment is direct
+                Username = subAdmin.Username,
                 CanChangeBooksData = subAdmin.CanChangeBooksData
             };
         }
@@ -28,13 +32,14 @@ namespace BibleExplanationControllers.Mappers
         {
             if (!string.IsNullOrWhiteSpace(dto.Username))
             {
-                subAdmin.UserName = dto.Username;
+                subAdmin.Username = dto.Username;
             }
 
             if (dto.CanChangeBooksData.HasValue)
             {
                 subAdmin.CanChangeBooksData = dto.CanChangeBooksData.Value;
             }
+            // Password is handled separately in the controller
         }
     }
 }

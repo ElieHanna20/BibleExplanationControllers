@@ -1,26 +1,27 @@
-﻿using BibleExplanationControllers.Dtos.AdminDtos;
-using BibleExplanationControllers.Models.User;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
+using BibleExplanationControllers.Data;
+using BibleExplanationControllers.Dtos.AdminDtos;
+using BibleExplanationControllers.Models.User;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace BibleExplanationControllers.Helpers
 {
     public class Helpers
     {
-        private readonly UserManager<AppUser> _userManager;
-        private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly AuthDbContext _context;
+        private readonly PasswordHasher _passwordHasher;
 
-        public Helpers(UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
+        public Helpers(AuthDbContext context, PasswordHasher passwordHasher)
         {
-            _userManager = userManager;
-            _roleManager = roleManager;
+            _context = context;
+            _passwordHasher = passwordHasher;
         }
 
         /// <summary>
-        /// Seeds the Admin user using only Username and Password from appsettings.json.
+        /// Seeds the Admin user using Username and Password from appsettings.json.
         /// If the Admin user exists, updates its password if necessary.
         /// </summary>
         public async Task SeedAdminAsync(IConfiguration configuration)
@@ -34,51 +35,31 @@ namespace BibleExplanationControllers.Helpers
                 throw new Exception("Admin settings are missing or invalid in appsettings.json.");
             }
 
-            var user = await _userManager.FindByNameAsync(adminSettings.Username);
-            Admin admin;
+            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Username == adminSettings.Username);
 
-            if (user == null)
+            if (admin == null)
             {
-                // Create new admin. Because Admin extends AppUser, we create an Admin instance.
-                admin = new Admin { UserName = adminSettings.Username };
-                var createResult = await _userManager.CreateAsync(admin, adminSettings.Password);
-                if (!createResult.Succeeded)
+                // Create new admin
+                admin = new Admin
                 {
-                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
-                    throw new Exception($"Failed to create admin user: {errors}");
-                }
+                    Id = Guid.NewGuid(),
+                    Username = adminSettings.Username,
+                    PasswordHash = _passwordHasher.HashPassword(adminSettings.Password)
+                };
 
-                // Assign the "Admin" role
-                await _userManager.AddToRoleAsync(admin, "Admin");
+                _context.Admins.Add(admin);
+                await _context.SaveChangesAsync();
                 Console.WriteLine("Admin user created successfully.");
             }
             else
             {
-                // Cast the found user to Admin; if the cast fails, it indicates a configuration issue.
-                admin = user as Admin;
-                if (admin == null)
+                // Update password if necessary
+                if (!_passwordHasher.VerifyPassword(admin.PasswordHash, adminSettings.Password))
                 {
-                    throw new Exception("The user exists but is not of type Admin.");
-                }
-
-                // If the admin exists, update its password if needed
-                var passwordValid = await _userManager.CheckPasswordAsync(admin, adminSettings.Password);
-                if (!passwordValid)
-                {
-                    var token = await _userManager.GeneratePasswordResetTokenAsync(admin);
-                    var resetResult = await _userManager.ResetPasswordAsync(admin, token, adminSettings.Password);
-                    if (!resetResult.Succeeded)
-                    {
-                        var errors = string.Join(", ", resetResult.Errors.Select(e => e.Description));
-                        throw new Exception($"Failed to update admin password: {errors}");
-                    }
+                    admin.PasswordHash = _passwordHasher.HashPassword(adminSettings.Password);
+                    _context.Admins.Update(admin);
+                    await _context.SaveChangesAsync();
                     Console.WriteLine("Admin password updated.");
-                }
-
-                // Ensure the admin is in the "Admin" role
-                if (!await _userManager.IsInRoleAsync(admin, "Admin"))
-                {
-                    await _userManager.AddToRoleAsync(admin, "Admin");
                 }
             }
         }
