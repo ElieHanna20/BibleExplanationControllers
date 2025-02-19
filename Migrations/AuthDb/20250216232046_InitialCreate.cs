@@ -4,10 +4,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BibleExplanationControllers.Migrations.Auth
+namespace BibleExplanationControllers.Migrations.AuthDb
 {
     /// <inheritdoc />
-    public partial class InitialAuthMigration : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -32,8 +32,6 @@ namespace BibleExplanationControllers.Migrations.Auth
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Username = table.Column<string>(type: "text", nullable: false),
                     PasswordHash = table.Column<string>(type: "text", nullable: false),
-                    RefreshToken = table.Column<string>(type: "text", nullable: true),
-                    RefreshTokenExpiry = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UserType = table.Column<string>(type: "character varying(8)", maxLength: 8, nullable: false),
                     CanChangeBooksData = table.Column<bool>(type: "boolean", nullable: true),
                     AdminId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -48,7 +46,7 @@ namespace BibleExplanationControllers.Migrations.Auth
                         column: x => x.AdminId,
                         principalTable: "Users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_Users_Users_SubAdminId",
                         column: x => x.SubAdminId,
@@ -98,7 +96,7 @@ namespace BibleExplanationControllers.Migrations.Auth
                 });
 
             migrationBuilder.CreateTable(
-                name: "Explanations",
+                name: "Explanation",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
@@ -110,21 +108,19 @@ namespace BibleExplanationControllers.Migrations.Auth
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Explanations", x => x.Id);
+                    table.PrimaryKey("PK_Explanation", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Explanations_Subtitle_SubtitleId",
+                        name: "FK_Explanation_Subtitle_SubtitleId",
                         column: x => x.SubtitleId,
                         principalTable: "Subtitle",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_Explanations_Users_SubAdminId",
+                        name: "FK_Explanation_Users_SubAdminId",
                         column: x => x.SubAdminId,
                         principalTable: "Users",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        principalColumn: "Id");
                     table.ForeignKey(
-                        name: "FK_Explanations_Users_WorkerId",
+                        name: "FK_Explanation_Users_WorkerId",
                         column: x => x.WorkerId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -164,18 +160,18 @@ namespace BibleExplanationControllers.Migrations.Auth
                 column: "BookId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Explanations_SubAdminId",
-                table: "Explanations",
+                name: "IX_Explanation_SubAdminId",
+                table: "Explanation",
                 column: "SubAdminId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Explanations_SubtitleId",
-                table: "Explanations",
+                name: "IX_Explanation_SubtitleId",
+                table: "Explanation",
                 column: "SubtitleId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Explanations_WorkerId",
-                table: "Explanations",
+                name: "IX_Explanation_WorkerId",
+                table: "Explanation",
                 column: "WorkerId");
 
             migrationBuilder.CreateIndex(
@@ -194,6 +190,12 @@ namespace BibleExplanationControllers.Migrations.Auth
                 column: "SubAdminId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Users_Username",
+                table: "Users",
+                column: "Username",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Verse_ChapterId",
                 table: "Verse",
                 column: "ChapterId");
@@ -208,7 +210,7 @@ namespace BibleExplanationControllers.Migrations.Auth
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Explanations");
+                name: "Explanation");
 
             migrationBuilder.DropTable(
                 name: "Verse");

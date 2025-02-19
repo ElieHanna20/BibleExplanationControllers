@@ -1,15 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using BibleExplanationControllers.Models.Bible;
-using BibleExplanationControllers.Models.User;
 
 namespace BibleExplanationControllers.Data
 {
-    public class BibleDbContext : DbContext
+    public class BibleDbContext(DbContextOptions<BibleDbContext> options) : DbContext(options)
     {
-        public BibleDbContext(DbContextOptions<BibleDbContext> options) : base(options)
-        {
-        }
-
         public DbSet<Book> Books { get; set; }
         public DbSet<Chapter> Chapters { get; set; }
         public DbSet<Subtitle> Subtitles { get; set; }
@@ -18,6 +13,8 @@ namespace BibleExplanationControllers.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
+
             modelBuilder.Entity<Book>().ToTable("Books", "bible");
             modelBuilder.Entity<Chapter>().ToTable("Chapters", "bible");
             modelBuilder.Entity<Subtitle>().ToTable("Subtitles", "bible");
@@ -65,11 +62,6 @@ namespace BibleExplanationControllers.Data
                 .HasOne(e => e.Worker)
                 .WithMany(w => w.Explanations)
                 .HasForeignKey(e => e.WorkerId);
-
-            modelBuilder.Entity<Worker>()
-                .HasOne(w => w.SubAdmin)
-                .WithMany(sa => sa.Workers)
-                .HasForeignKey(w => w.SubAdminId);
         }
     }
 }

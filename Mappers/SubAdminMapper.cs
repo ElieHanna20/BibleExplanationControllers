@@ -1,6 +1,5 @@
 ﻿using BibleExplanationControllers.Dtos.SubAdminDtos;
 using BibleExplanationControllers.Models.User;
-using System;
 
 namespace BibleExplanationControllers.Mappers
 {
@@ -8,7 +7,7 @@ namespace BibleExplanationControllers.Mappers
     {
         public static SubAdmin ToSubAdmin(this SubAdminCreateDto dto, Guid adminId)
         {
-            return new SubAdmin
+            return new()
             {
                 Id = Guid.NewGuid(), // Generate a new GUID for the SubAdmin's Id
                 Username = dto.Username,
@@ -20,7 +19,7 @@ namespace BibleExplanationControllers.Mappers
 
         public static SubAdminDetailsDto ToSubAdminDetailsDto(this SubAdmin subAdmin)
         {
-            return new SubAdminDetailsDto
+            return new()
             {
                 Id = subAdmin.Id, // Now both are Guid, assignment is direct
                 Username = subAdmin.Username,

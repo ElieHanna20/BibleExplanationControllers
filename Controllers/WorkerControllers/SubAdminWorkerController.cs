@@ -1,50 +1,48 @@
-﻿using BibleExplanationControllers.Dtos.WorkerDtos;
+﻿using BibleExplanationControllers.Data;
+using BibleExplanationControllers.Dtos.WorkerDtos;
+using BibleExplanationControllers.Helpers;
 using BibleExplanationControllers.Mappers;
 using BibleExplanationControllers.Models.User;
-using BibleExplanationControllers.Helpers;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
-using BibleExplanationControllers.Data;
 
 namespace BibleExplanationControllers.Controllers.WorkerControllers
 {
     [Route("api/subadmins/workers")]
     [ApiController]
-    [Authorize(Roles = "SubAdmin")]
     public class SubAdminWorkerController : ControllerBase
     {
         private readonly AuthDbContext _context;
         private readonly PasswordHasher _passwordHasher;
+        private readonly UserAuthentication _userAuthentication;
 
-        public SubAdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher)
+        public SubAdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication)
         {
             _context = context;
             _passwordHasher = passwordHasher;
+            _userAuthentication = userAuthentication;
+        }
+
+        private async Task<SubAdmin?> GetSubAdminAsync()
+        {
+            var currentUsername = _userAuthentication.GetCurrentUsername();
+            if (string.IsNullOrWhiteSpace(currentUsername)) return null;
+
+            return await _context.SubAdmins.FirstOrDefaultAsync(a => a.Username == currentUsername);
         }
 
         [HttpPost("create")]
         public async Task<IActionResult> CreateWorker([FromBody] WorkerCreateDto dto)
         {
-            // Get current SubAdmin ID from token
-            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserIdString == null)
-                return Unauthorized("Invalid credentials");
-
-            if (!Guid.TryParse(currentUserIdString, out var currentUserId))
-                return Unauthorized("Invalid user ID");
-
-            // Fetch current SubAdmin from database
-            var subAdmin = await _context.SubAdmins.FindAsync(currentUserId);
-            if (subAdmin == null)
-                return Unauthorized("Invalid SubAdmin");
+            var subAdmin = await GetSubAdminAsync();
+            if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
+                return Unauthorized("Unauthorized. Only SubAdmins can create Workers.");
 
             // Check if username already exists
             if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
                 return BadRequest(new { message = "Username already exists" });
 
-            // Create a new Worker instance using the mapper, setting SubAdminId to the current SubAdmin's Id
+            // Create a new Worker instance
             var worker = dto.ToWorker(subAdmin.Id);
 
             // Hash the password
@@ -60,43 +58,49 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpGet("my-workers")]
         public async Task<IActionResult> GetMyWorkers()
         {
-            // Get current SubAdmin ID from token
-            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserIdString == null)
-                return Unauthorized("Invalid credentials");
-
-            if (!Guid.TryParse(currentUserIdString, out var subAdminId))
-                return Unauthorized("Invalid user ID");
+            var subAdmin = await GetSubAdminAsync();
+            if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
+                return Unauthorized("Unauthorized");
 
             var workers = await _context.Workers
-                .Where(w => w.SubAdminId == subAdminId)
+                .Where(w => w.SubAdminId == subAdmin.Id)
                 .Select(w => w.ToWorkerResponseDto())
                 .ToListAsync();
 
             return Ok(workers);
         }
 
+        [HttpGet("my-workers/{workerId}")]
+        public async Task<IActionResult> GetWorkerById(Guid workerId)
+        {
+            var subAdmin = await GetSubAdminAsync();
+            if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
+            var worker = await _context.Workers
+                .Where(w => w.Id == workerId && w.SubAdminId == subAdmin.Id)
+                .Select(w => w.ToWorkerResponseDto())
+                .FirstOrDefaultAsync();
+
+            if (worker == null)
+                return NotFound("Worker not found or does not belong to this SubAdmin.");
+
+            return Ok(worker);
+        }
+
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateWorker(Guid id, [FromBody] WorkerUpdateDto dto)
         {
+            var subAdmin = await GetSubAdminAsync();
+            if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
                 return NotFound("Worker not found");
 
-            // Get current SubAdmin ID from token
-            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserIdString == null)
-                return Unauthorized("Invalid credentials");
-
-            if (!Guid.TryParse(currentUserIdString, out var currentUserId))
-                return Unauthorized("Invalid user ID");
-
-            var subAdmin = await _context.SubAdmins.FindAsync(currentUserId);
-            if (subAdmin == null)
-                return Unauthorized("Invalid SubAdmin");
-
             // SubAdmins can only update their own workers
-            if (worker.SubAdminId != currentUserId)
+            if (worker.SubAdminId != subAdmin.Id)
                 return Forbid("You are not authorized to update this worker.");
 
             // Only allow changing CanChangeBooksData if the SubAdmin is permitted
@@ -121,35 +125,17 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWorker(Guid id)
         {
+            var subAdmin = await GetSubAdminAsync();
+            if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
-            {
                 return NotFound("Worker not found");
-            }
-
-            // Get current SubAdmin ID from token
-            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserIdString == null)
-            {
-                return Unauthorized("Invalid credentials");
-            }
-
-            if (!Guid.TryParse(currentUserIdString, out var currentUserId))
-            {
-                return Unauthorized("Invalid user ID");
-            }
-
-            var subAdmin = await _context.SubAdmins.FindAsync(currentUserId);
-            if (subAdmin == null)
-            {
-                return Unauthorized("Invalid SubAdmin");
-            }
 
             // SubAdmin can only delete their own workers
-            if (worker.SubAdminId != currentUserId)
-            {
+            if (worker.SubAdminId != subAdmin.Id)
                 return Forbid("You are not authorized to delete this worker.");
-            }
 
             _context.Workers.Remove(worker);
             await _context.SaveChangesAsync();

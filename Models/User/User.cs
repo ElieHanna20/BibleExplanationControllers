@@ -1,9 +1,8 @@
-﻿using System;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace BibleExplanationControllers.Models.User
 {
-    public class AppUser
+    public class User
     {
         [Key]
         public Guid Id { get; set; } // Primary key generated as a GUID
@@ -13,8 +12,5 @@ namespace BibleExplanationControllers.Models.User
 
         [Required]
         public required string PasswordHash { get; set; } // Store hashed passwords
-
-        public string? RefreshToken { get; set; }
-        public DateTime? RefreshTokenExpiry { get; set; }
     }
 }

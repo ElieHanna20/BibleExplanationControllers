@@ -3,42 +3,40 @@ using BibleExplanationControllers.Dtos.WorkerDtos;
 using BibleExplanationControllers.Helpers;
 using BibleExplanationControllers.Mappers;
 using BibleExplanationControllers.Models.User;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 
 namespace BibleExplanationControllers.Controllers.WorkerControllers
 {
     [Route("api/admin/workers")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
     public class AdminWorkerController : ControllerBase
     {
         private readonly AuthDbContext _context;
         private readonly PasswordHasher _passwordHasher;
+        private readonly UserAuthentication _userAuthentication;
 
-        public AdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher)
+        public AdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication)
         {
             _context = context;
             _passwordHasher = passwordHasher;
+            _userAuthentication = userAuthentication;
+        }
+
+        private async Task<Admin?> GetAdminAsync()
+        {
+            var currentUsername = _userAuthentication.GetCurrentUsername();
+            if (string.IsNullOrWhiteSpace(currentUsername)) return null;
+
+            return await _context.Admins.FirstOrDefaultAsync(a => a.Username == currentUsername);
         }
 
         [HttpPost("create")]
         public async Task<IActionResult> CreateWorker([FromBody] WorkerCreateDto dto)
         {
-            // Get current user ID from token
-            var currentUserIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserIdString == null)
-                return Unauthorized("Invalid credentials");
-
-            if (!Guid.TryParse(currentUserIdString, out var currentUserId))
-                return Unauthorized("Invalid user ID");
-
-            // Fetch current user from database
-            var currentUser = await _context.Admins.FindAsync(currentUserId);
-            if (currentUser == null)
-                return Unauthorized("Invalid Admin");
+            var admin = await GetAdminAsync();
+            if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
+                return Unauthorized("Unauthorized. Only Admins can create Workers.");
 
             // Check if username already exists
             if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
@@ -68,6 +66,10 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpGet]
         public async Task<IActionResult> GetAllWorkers(Guid? subAdminId = null)
         {
+            var admin = await GetAdminAsync();
+            if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             IQueryable<Worker> workersQuery = _context.Workers;
 
             if (subAdminId.HasValue)
@@ -85,6 +87,10 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpPatch("{id}")]
         public async Task<IActionResult> UpdateWorker(Guid id, [FromBody] WorkerUpdateDto dto)
         {
+            var admin = await GetAdminAsync();
+            if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
                 return NotFound("Worker not found");
@@ -107,6 +113,10 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetWorkerById(Guid id)
         {
+            var admin = await GetAdminAsync();
+            if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
                 return NotFound("Worker not found");
@@ -117,6 +127,10 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWorker(Guid id)
         {
+            var admin = await GetAdminAsync();
+            if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
+                return Unauthorized("Unauthorized");
+
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
                 return NotFound("Worker not found");
@@ -127,5 +141,4 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
             return Ok(new { message = "Worker deleted successfully" });
         }
     }
-
 }

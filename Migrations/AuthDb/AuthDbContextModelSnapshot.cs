@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BibleExplanationControllers.Migrations.Auth
+namespace BibleExplanationControllers.Migrations.AuthDb
 {
     [DbContext(typeof(AuthDbContext))]
     partial class AuthDbContextModelSnapshot : ModelSnapshot
@@ -90,7 +90,7 @@ namespace BibleExplanationControllers.Migrations.Auth
 
                     b.HasIndex("WorkerId");
 
-                    b.ToTable("Explanations");
+                    b.ToTable("Explanation");
                 });
 
             modelBuilder.Entity("BibleExplanationControllers.Models.Bible.Subtitle", b =>
@@ -146,7 +146,7 @@ namespace BibleExplanationControllers.Migrations.Auth
                     b.ToTable("Verse");
                 });
 
-            modelBuilder.Entity("BibleExplanationControllers.Models.User.AppUser", b =>
+            modelBuilder.Entity("BibleExplanationControllers.Models.User.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -155,12 +155,6 @@ namespace BibleExplanationControllers.Migrations.Auth
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("RefreshTokenExpiry")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UserType")
                         .IsRequired()
@@ -182,14 +176,17 @@ namespace BibleExplanationControllers.Migrations.Auth
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.Admin", b =>
                 {
-                    b.HasBaseType("BibleExplanationControllers.Models.User.AppUser");
+                    b.HasBaseType("BibleExplanationControllers.Models.User.User");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
 
                     b.HasDiscriminator().HasValue("Admin");
                 });
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.SubAdmin", b =>
                 {
-                    b.HasBaseType("BibleExplanationControllers.Models.User.AppUser");
+                    b.HasBaseType("BibleExplanationControllers.Models.User.User");
 
                     b.Property<Guid>("AdminId")
                         .HasColumnType("uuid");
@@ -204,7 +201,7 @@ namespace BibleExplanationControllers.Migrations.Auth
 
             modelBuilder.Entity("BibleExplanationControllers.Models.User.Worker", b =>
                 {
-                    b.HasBaseType("BibleExplanationControllers.Models.User.AppUser");
+                    b.HasBaseType("BibleExplanationControllers.Models.User.User");
 
                     b.Property<bool>("CanChangeBooksData")
                         .HasColumnType("boolean");
@@ -238,13 +235,11 @@ namespace BibleExplanationControllers.Migrations.Auth
                 {
                     b.HasOne("BibleExplanationControllers.Models.User.SubAdmin", "SubAdmin")
                         .WithMany("Explanations")
-                        .HasForeignKey("SubAdminId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("SubAdminId");
 
                     b.HasOne("BibleExplanationControllers.Models.Bible.Subtitle", "Subtitle")
                         .WithMany("Explanations")
-                        .HasForeignKey("SubtitleId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("SubtitleId");
 
                     b.HasOne("BibleExplanationControllers.Models.User.Worker", "Worker")
                         .WithMany("Explanations")
@@ -289,7 +284,7 @@ namespace BibleExplanationControllers.Migrations.Auth
                     b.HasOne("BibleExplanationControllers.Models.User.Admin", "Admin")
                         .WithMany("SubAdmins")
                         .HasForeignKey("AdminId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Admin");

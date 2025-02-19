@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace BibleExplanationControllers.Models.User
 {
-    public class Worker : AppUser
+    public class Worker : User
     {
         public bool CanChangeBooksData { get; set; }
 

@@ -1,6 +1,5 @@
 ﻿using BibleExplanationControllers.Dtos.WorkerDtos;
 using BibleExplanationControllers.Models.User;
-using System;
 
 namespace BibleExplanationControllers.Mappers
 {
@@ -8,7 +7,7 @@ namespace BibleExplanationControllers.Mappers
     {
         public static Worker ToWorker(this WorkerCreateDto dto, Guid subAdminId)
         {
-            return new Worker
+            return new()
             {
                 Id = Guid.NewGuid(),
                 Username = dto.Username,
@@ -20,7 +19,7 @@ namespace BibleExplanationControllers.Mappers
 
         public static WorkerDetailsDto ToWorkerResponseDto(this Worker worker)
         {
-            return new WorkerDetailsDto
+            return new()
             {
                 Id = worker.Id, // Now a Guid
                 Username = worker.Username,

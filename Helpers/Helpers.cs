@@ -1,24 +1,13 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using BibleExplanationControllers.Data;
-using BibleExplanationControllers.Dtos.AdminDtos;
+﻿using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Models.User;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace BibleExplanationControllers.Helpers
 {
-    public class Helpers
+    public class Helpers(AuthDbContext context, PasswordHasher passwordHasher)
     {
-        private readonly AuthDbContext _context;
-        private readonly PasswordHasher _passwordHasher;
-
-        public Helpers(AuthDbContext context, PasswordHasher passwordHasher)
-        {
-            _context = context;
-            _passwordHasher = passwordHasher;
-        }
+        private readonly AuthDbContext _context = context;
+        private readonly PasswordHasher _passwordHasher = passwordHasher;
 
         /// <summary>
         /// Seeds the Admin user using Username and Password from appsettings.json.
@@ -26,16 +15,15 @@ namespace BibleExplanationControllers.Helpers
         /// </summary>
         public async Task SeedAdminAsync(IConfiguration configuration)
         {
-            var adminSettings = configuration.GetSection("Admin").Get<AdminSettings>();
+            var adminUsername = configuration["Admin:Username"];
+            var adminPassword = configuration["Admin:Password"];
 
-            if (adminSettings == null ||
-                string.IsNullOrWhiteSpace(adminSettings.Username) ||
-                string.IsNullOrWhiteSpace(adminSettings.Password))
+            if (string.IsNullOrWhiteSpace(adminUsername) || string.IsNullOrWhiteSpace(adminPassword))
             {
-                throw new Exception("Admin settings are missing or invalid in appsettings.json.");
+                throw new Exception("Admin credentials are missing in appsettings.json.");
             }
 
-            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Username == adminSettings.Username);
+            var admin = await _context.Admins.FirstOrDefaultAsync(a => a.Username == adminUsername);
 
             if (admin == null)
             {
@@ -43,8 +31,8 @@ namespace BibleExplanationControllers.Helpers
                 admin = new Admin
                 {
                     Id = Guid.NewGuid(),
-                    Username = adminSettings.Username,
-                    PasswordHash = _passwordHasher.HashPassword(adminSettings.Password)
+                    Username = adminUsername,
+                    PasswordHash = _passwordHasher.HashPassword(adminPassword)
                 };
 
                 _context.Admins.Add(admin);
@@ -54,9 +42,9 @@ namespace BibleExplanationControllers.Helpers
             else
             {
                 // Update password if necessary
-                if (!_passwordHasher.VerifyPassword(admin.PasswordHash, adminSettings.Password))
+                if (!_passwordHasher.VerifyPassword(admin.PasswordHash, adminPassword))
                 {
-                    admin.PasswordHash = _passwordHasher.HashPassword(adminSettings.Password);
+                    admin.PasswordHash = _passwordHasher.HashPassword(adminPassword);
                     _context.Admins.Update(admin);
                     await _context.SaveChangesAsync();
                     Console.WriteLine("Admin password updated.");
