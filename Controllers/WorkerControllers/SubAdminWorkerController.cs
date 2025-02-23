@@ -10,18 +10,11 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
 {
     [Route("api/subadmins/workers")]
     [ApiController]
-    public class SubAdminWorkerController : ControllerBase
+    public class SubAdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication) : ControllerBase
     {
-        private readonly AuthDbContext _context;
-        private readonly PasswordHasher _passwordHasher;
-        private readonly UserAuthentication _userAuthentication;
-
-        public SubAdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication)
-        {
-            _context = context;
-            _passwordHasher = passwordHasher;
-            _userAuthentication = userAuthentication;
-        }
+        private readonly AuthDbContext _context = context;
+        private readonly PasswordHasher _passwordHasher = passwordHasher;
+        private readonly UserAuthentication _userAuthentication = userAuthentication;
 
         private async Task<SubAdmin?> GetSubAdminAsync()
         {
@@ -41,6 +34,12 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
             // Check if username already exists
             if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
                 return BadRequest(new { message = "Username already exists" });
+
+            // Validate plain text password BEFORE hashing
+            if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+            {
+                return BadRequest(new { message = errorMessage });
+            }
 
             // Create a new Worker instance
             var worker = dto.ToWorker(subAdmin.Id);
@@ -92,26 +91,33 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         public async Task<IActionResult> UpdateWorker(Guid id, [FromBody] WorkerUpdateDto dto)
         {
             var subAdmin = await GetSubAdminAsync();
+
             if (subAdmin == null || !await _userAuthentication.IsAuthenticatedAsync<SubAdmin>("Username", _context))
-                return Unauthorized("Unauthorized");
+            {
+                return Unauthorized(new { message = "Unauthorized. Only the assigned SubAdmin can update this worker." });
+            }
 
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
-                return NotFound("Worker not found");
+                return NotFound(new { message = "Worker not found" });
 
-            // SubAdmins can only update their own workers
-            if (worker.SubAdminId != subAdmin.Id)
-                return Forbid("You are not authorized to update this worker.");
-
-            // Only allow changing CanChangeBooksData if the SubAdmin is permitted
-            if (dto.CanChangeBooksData == true && !subAdmin.CanChangeBooksData)
-                return Forbid("You are not allowed to grant CanChangeBooksData permission.");
+            // Centralized permission check: If SubAdmin is not the owner of the Worker, deny access
+            if (worker.SubAdminId != subAdmin.Id || (dto.CanChangeBooksData == true && !subAdmin.CanChangeBooksData))
+            {
+                return Unauthorized(new { message = "You do not have the required permissions to update this worker." });
+            }
 
             // Update worker fields via the mapper
             worker.UpdateWorkerFromDto(dto);
 
             if (!string.IsNullOrWhiteSpace(dto.Password))
             {
+                // Validate password complexity
+                if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+                {
+                    return BadRequest(new { message = errorMessage });
+                }
+
                 // Hash and update password
                 worker.PasswordHash = _passwordHasher.HashPassword(dto.Password);
             }
@@ -121,6 +127,7 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
 
             return Ok(new { message = "Worker updated successfully" });
         }
+
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWorker(Guid id)

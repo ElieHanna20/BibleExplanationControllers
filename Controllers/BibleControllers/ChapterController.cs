@@ -1,6 +1,7 @@
 ﻿using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Dtos.ChapterDtos;
 using BibleExplanationControllers.Mappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,11 +10,13 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "CanChangeBooksData")]
     public class ChapterController(BibleDbContext context) : ControllerBase
     {
         private readonly BibleDbContext _context = context;
 
         [HttpGet("book/{bookId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetChaptersByBook(int bookId)
         {
             // Check if the book exists
@@ -34,6 +37,7 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetChapterById(int id)
         {
 

@@ -1,6 +1,7 @@
 ﻿using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Dtos.BookDtos;
 using BibleExplanationControllers.Mappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,13 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "CanChangeBooksData")]
     public class BookController(BibleDbContext context) : ControllerBase
     {
         private readonly BibleDbContext _context = context;
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var books = await _context.Books.Select(b => b.ToBookDto()).ToListAsync();
@@ -20,6 +23,7 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById([FromRoute] int id)
         {
             var book = await _context.Books.FindAsync(id);

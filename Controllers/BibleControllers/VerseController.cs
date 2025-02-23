@@ -1,6 +1,7 @@
 ﻿using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Dtos.VerseDtos;
 using BibleExplanationControllers.Mappers;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,11 +9,13 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize(Policy = "CanChangeBooksData")]
     public class VerseController(BibleDbContext context) : Controller
     {
         private readonly BibleDbContext _context = context;
 
         [HttpGet("subtitle/{subtitleId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetVersesBySubtitle(int subtitleId)
         {
             // Validate the subtitle exists
@@ -34,6 +37,7 @@ namespace BibleExplanationControllers.Controllers.BibleControllers
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById([FromRoute] int id)
         {
             var verse = await _context.Verses.FindAsync(id);

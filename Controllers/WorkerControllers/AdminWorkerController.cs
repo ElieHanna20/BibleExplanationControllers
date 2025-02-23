@@ -10,18 +10,11 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
 {
     [Route("api/admin/workers")]
     [ApiController]
-    public class AdminWorkerController : ControllerBase
+    public class AdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication) : ControllerBase
     {
-        private readonly AuthDbContext _context;
-        private readonly PasswordHasher _passwordHasher;
-        private readonly UserAuthentication _userAuthentication;
-
-        public AdminWorkerController(AuthDbContext context, PasswordHasher passwordHasher, UserAuthentication userAuthentication)
-        {
-            _context = context;
-            _passwordHasher = passwordHasher;
-            _userAuthentication = userAuthentication;
-        }
+        private readonly AuthDbContext _context = context;
+        private readonly PasswordHasher _passwordHasher = passwordHasher;
+        private readonly UserAuthentication _userAuthentication = userAuthentication;
 
         private async Task<Admin?> GetAdminAsync()
         {
@@ -44,6 +37,11 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
 
             if (dto.SubAdminId == null)
                 return BadRequest("SubAdminId is required when Admin creates a worker.");
+
+            if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+            {
+                return BadRequest(new { message = errorMessage });
+            }
 
             // Validate the provided SubAdminId
             var subAdmin = await _context.SubAdmins.FindAsync(dto.SubAdminId.Value);
@@ -89,17 +87,23 @@ namespace BibleExplanationControllers.Controllers.WorkerControllers
         {
             var admin = await GetAdminAsync();
             if (admin == null || !await _userAuthentication.IsAuthenticatedAsync<Admin>("Username", _context))
-                return Unauthorized("Unauthorized");
+                return Unauthorized(new { message = "Unauthorized" });
 
             var worker = await _context.Workers.FindAsync(id);
             if (worker == null)
-                return NotFound("Worker not found");
+                return NotFound(new { message = "Worker not found" });
 
             // Update worker fields via the mapper
             worker.UpdateWorkerFromDto(dto);
 
             if (!string.IsNullOrWhiteSpace(dto.Password))
             {
+                // Validate password complexity
+                if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+                {
+                    return BadRequest(new { message = errorMessage });
+                }
+
                 // Hash and update password
                 worker.PasswordHash = _passwordHasher.HashPassword(dto.Password);
             }

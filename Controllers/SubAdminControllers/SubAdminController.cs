@@ -39,6 +39,12 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
             if (await _context.Users.AnyAsync(u => u.Username == dto.Username))
                 return BadRequest(new { message = "Username already exists" });
 
+            // Validate plain text password BEFORE hashing
+            if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+            {
+                return BadRequest(new { message = errorMessage });
+            }
+
             // Create SubAdmin and hash password
             var subAdmin = dto.ToSubAdmin(admin.Id);
             subAdmin.PasswordHash = _passwordHasher.HashPassword(dto.Password);
@@ -92,32 +98,43 @@ namespace BibleExplanationControllers.Controllers.SubAdminControllers
             if (subAdmin == null)
                 return NotFound(new { message = "SubAdmin not found" });
 
-            // If CanChangeBooksData is set to false for the SubAdmin, revoke it for all their Workers
-            if (dto.CanChangeBooksData == false)
+            // Handle CanChangeBooksData permission update
+            if (dto.CanChangeBooksData.HasValue) // Only update if a new value is provided
             {
-                subAdmin.CanChangeBooksData = false;
-                foreach (var worker in subAdmin.Workers)
+                if (!dto.CanChangeBooksData.Value) // If changed to false, revoke for all Workers
                 {
-                    worker.CanChangeBooksData = false;
+                    subAdmin.CanChangeBooksData = false;
+                    foreach (var worker in subAdmin.Workers)
+                    {
+                        worker.CanChangeBooksData = false;
+                    }
                 }
-            }
-            else
-            {
-                // If CanChangeBooksData is not changed to false, the Workers' permission remains as is
-                subAdmin.CanChangeBooksData = (bool)dto.CanChangeBooksData;
+                else
+                {
+                    subAdmin.CanChangeBooksData = true; // Allow changing books data
+                }
             }
 
             // Update other fields
             subAdmin.UpdateSubAdminFromDto(dto);
 
-            // Update password if provided
+            // Update password only if a new password is provided
             if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                // Validate password complexity
+                if (!PasswordValidator.IsValid(dto.Password, out string errorMessage))
+                {
+                    return BadRequest(new { message = errorMessage });
+                }
+
                 subAdmin.PasswordHash = _passwordHasher.HashPassword(dto.Password);
+            }
 
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "SubAdmin updated successfully" });
         }
+
 
 
 

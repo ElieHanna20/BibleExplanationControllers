@@ -1,6 +1,7 @@
 using BibleExplanationControllers.Data;
 using BibleExplanationControllers.Helpers;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 
@@ -53,7 +54,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;  // Sliding expiration
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanChangeBooksData", policy =>
+        policy.Requirements.Add(new CanChangeBooksDataRequirement()));
+
+builder.Services.AddSingleton<IAuthorizationHandler, CanChangeBooksDataHandler>();
 
 var app = builder.Build();
 
